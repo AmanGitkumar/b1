@@ -4,41 +4,21 @@ const Income = require("../Models/Income");
 const ensureAuthenticated = require("../Middlewares/Auth");
 const router = express.Router();
 
-
-// Get expense summary
-router.get("/expense-summary", async (req, res) => {
+router.get("/summary", ensureAuthenticated, async (req, res) => {
+  console.log("Dashboard summary route hit");
   try {
-      const expenses = await Expense.find({});
+      const totalIncome = await Income.aggregate([
+          { $match: { user: req.user.id } },
+          { $group: { _id: null, total: { $sum: "$amount" } } }
+      ]);
 
-      // Group expenses by category
-      const categorySummary = expenses.reduce((acc, expense) => {
-          acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-          return acc;
-      }, {});
-
-      // Format data for frontend
-      const categoryData = Object.keys(categorySummary).map((category) => ({
-          category,
-          amount: categorySummary[category],
-      }));
-
-      // Monthly trend data
-      const monthlyData = {};
-      expenses.forEach((expense) => {
-          const month = new Date(expense.date).toLocaleString("en-US", { month: "short", year: "numeric" });
-          monthlyData[month] = (monthlyData[month] || 0) + expense.amount;
-      });
-
-      const monthlyTrend = Object.keys(monthlyData).map((month) => ({
-          month,
-          amount: monthlyData[month],
-      }));
-
-      res.json({ categoryData, monthlyTrend });
+      res.json({ totalIncome: totalIncome[0]?.total || 0 });
   } catch (error) {
-      res.status(500).json({ message: "Error fetching expense summary", error });
+      console.error("Error in dashboard summary:", error);
+      res.status(500).json({ error: "Error fetching dashboard data" });
   }
 });
+
 
 
 
